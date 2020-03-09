@@ -19,15 +19,11 @@ import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.Task;
+import com.google.firebase.Timestamp;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.firestore.DocumentReference;
-import com.google.firebase.firestore.DocumentSnapshot;
-import com.google.firebase.firestore.FieldValue;
+import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.GeoPoint;
-import com.google.firebase.firestore.SetOptions;
 import com.mapbox.mapboxsdk.Mapbox;
 import com.mapbox.mapboxsdk.location.LocationComponent;
 import com.mapbox.mapboxsdk.location.LocationComponentActivationOptions;
@@ -40,7 +36,6 @@ import com.mapbox.mapboxsdk.maps.Style;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TimeZone;
@@ -52,7 +47,7 @@ public class RecordingActivity extends AppCompatActivity {
     private String mEventId;
     private FirebaseFirestore db;
     private FirebaseAuth auth;
-    DocumentReference currentUserCoordinatesRef;
+    CollectionReference coordinatesRef;
 
     // Access token is need to successfully run. For more info checkout: https://www.mapbox.com/
     private String accessToken = "pk.eyJ1IjoiamFja3lqcyIsImEiOiJjazZjcjNndDAxZXo2M25wanVqNng1MDNsIn0.W3EnhJe_JOD0Cg9OBeTghA";
@@ -120,22 +115,7 @@ public class RecordingActivity extends AppCompatActivity {
         db = FirebaseFirestore.getInstance();
         auth = FirebaseAuth.getInstance();
         String currentUserUUID = auth.getCurrentUser().getUid();
-        currentUserCoordinatesRef = db.collection("events").document(mEventId).collection("coordinates").document(currentUserUUID);
-
-        /* check if document exists, if not create it */
-        currentUserCoordinatesRef.get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
-            @Override
-            public void onComplete(@NonNull Task<DocumentSnapshot> task) {
-                if (task.isSuccessful()) {
-                    DocumentSnapshot doc = task.getResult();
-                    if (!doc.exists()) {
-                        Map<String, Object> emptyData = new HashMap<>();
-                        emptyData.put("data", new ArrayList<GeoPoint>());
-                        currentUserCoordinatesRef.set(emptyData, SetOptions.merge());
-                    }
-                }
-            }
-        });
+        coordinatesRef = db.collection("events").document(mEventId).collection("coordinates");
 
         /**
          * Note on GPS current speed: https://en.wikipedia.org/wiki/Speedometer#GPS
@@ -348,10 +328,11 @@ public class RecordingActivity extends AppCompatActivity {
 
 
                 Map<String, Object> newData = new HashMap<>();
+                newData.put("user_uuid", auth.getCurrentUser().getUid());
                 newData.put("latlng", new GeoPoint(location.getLatitude(), location.getLongitude()));
-                newData.put("time", lastLocation.getTime());
+                newData.put("timestamp", new Timestamp(lastLocation.getTime() / 1000, 0));
 
-                currentUserCoordinatesRef.update("data", FieldValue.arrayUnion(newData));
+                coordinatesRef.add(newData);
 
                 //update location on map
                 if (mapboxMap.getLocationComponent().isLocationComponentEnabled() && mapboxMap.getLocationComponent().isLocationComponentActivated()) {
