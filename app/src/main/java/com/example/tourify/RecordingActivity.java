@@ -319,13 +319,19 @@ public class RecordingActivity extends AppCompatActivity {
 
                 // update distance travelled
                 if (lastLocation != null) {
+                    long timeDiff = location.getTime() - lastLocation.getTime();
+
+                    // only update location if >= 10 seconds has elapsed
+                    if (timeDiff < 10000) {
+                        continue;
+                    }
+
                     distanceTravelled += lastLocation.distanceTo(location);
                     textViewDistanceTravelled.setText(Math.round(distanceTravelled / 100.0) / 10.0 + " km");
                 }
 
                 //update last location recorded
                 lastLocation = location;
-
 
                 Map<String, Object> newData = new HashMap<>();
                 newData.put("user_uuid", auth.getCurrentUser().getUid());
