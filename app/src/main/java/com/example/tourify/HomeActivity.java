@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -16,6 +17,8 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.firebase.ui.auth.AuthUI;
 import com.firebase.ui.auth.IdpResponse;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
 import com.google.firebase.Timestamp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -23,6 +26,7 @@ import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreException;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
 
@@ -44,6 +48,12 @@ public class HomeActivity extends AppCompatActivity {
     private RecyclerView.Adapter mAdapter;
     private RecyclerView.LayoutManager mLayoutManager;
 
+    private Button buttonSignout;
+
+    List<AuthUI.IdpConfig> providers;
+    CollectionReference eventsCollectionRef;
+    ListenerRegistration eventsUpdatesListener;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -55,19 +65,36 @@ public class HomeActivity extends AppCompatActivity {
         mRecyclerView = findViewById(R.id.recyclerView);
         mRecyclerView.setLayoutManager(mLayoutManager);
 
+        buttonSignout = findViewById(R.id.buttonSignout);
+
         // Choose authentication providers
-        List<AuthUI.IdpConfig> providers = Arrays.asList(
+        providers = Arrays.asList(
                 new AuthUI.IdpConfig.GoogleBuilder().build()
         );
         auth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
-        if (auth.getCurrentUser() == null) {
-            startSignOnActivity(providers);
+        if (auth.getCurrentUser() != null) {
+            eventsCollectionRef = db.collection("events");
+            eventsUpdatesListener = eventsCollectionRef.addSnapshotListener(new MyEventListener());
         }
-        currentUser = auth.getCurrentUser();
 
-        CollectionReference eventsCollectionRef = db.collection("events");
-        eventsCollectionRef.addSnapshotListener(new MyEventListener());
+        buttonSignout.setOnClickListener(new SignOutEventListener());
+        startSignOnActivity(providers);
+    }
+
+    private class SignOutEventListener implements View.OnClickListener {
+
+        @Override
+        public void onClick(View v) {
+            if (auth.getCurrentUser() == null) {
+                startSignOnActivity(providers);
+                buttonSignout.setText("SignOut");
+            } else {
+                signOut();
+                buttonSignout.setText("SignIn");
+            }
+
+        }
     }
 
     private class MyEventListener implements EventListener<QuerySnapshot> {
@@ -99,6 +126,18 @@ public class HomeActivity extends AppCompatActivity {
         }
     }
 
+    public void signOut() {
+        AuthUI.getInstance()
+                .signOut(this)
+                .addOnCompleteListener(new OnCompleteListener<Void>() {
+                    public void onComplete(@NonNull Task<Void> task) {
+                        eventsUpdatesListener.remove();
+                        tourifyEvents.clear();
+                        mAdapter.notifyDataSetChanged();
+                    }
+                });
+    }
+
     private void startSignOnActivity(List<AuthUI.IdpConfig> providers) {
         startActivityForResult(
                 AuthUI.getInstance()
@@ -117,7 +156,8 @@ public class HomeActivity extends AppCompatActivity {
 
             if (resultCode == RESULT_OK) {
                 // Successfully signed in
-                FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+                eventsCollectionRef = db.collection("events");
+                eventsUpdatesListener = eventsCollectionRef.addSnapshotListener(new MyEventListener());
             } else {
                 // Sign in failed. If response is null the user canceled the
                 // sign-in flow using the back button. Otherwise check
