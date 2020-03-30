@@ -322,7 +322,7 @@ public class RecordingActivity extends AppCompatActivity {
                     long timeDiff = location.getTime() - lastLocation.getTime();
 
                     // only update location if >= 10 seconds has elapsed
-                    if (timeDiff < 10000) {
+                    if (timeDiff < 3000) {
                         continue;
                     }
 
