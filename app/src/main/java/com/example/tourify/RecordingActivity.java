@@ -369,6 +369,10 @@ public class RecordingActivity extends AppCompatActivity {
                 newData.put("user_uuid", auth.getCurrentUser().getUid());
                 newData.put("latlng", new GeoPoint(location.getLatitude(), location.getLongitude()));
                 newData.put("timestamp", new Timestamp(lastLocation.getTime() / 1000, 0));
+                newData.put("average_speed", averageSpeedText);
+                newData.put("current_speed", currentSpeedText);
+                newData.put("distance_travelled", distanceTravelledText);
+                newData.put("time_elapsed", timeElapsedText);
                 coordinatesRef.add(newData);
             }
         }
