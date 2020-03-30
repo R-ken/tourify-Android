@@ -302,6 +302,11 @@ public class RecordingActivity extends AppCompatActivity {
         public void onLocationResult(LocationResult locationResult) {
             super.onLocationResult(locationResult);
 
+            String currentSpeedText;
+            String averageSpeedText;
+            String distanceTravelledText;
+            String timeElapsedText;
+
             if (locationResult == null) {
                 return;
             }
@@ -317,48 +322,58 @@ public class RecordingActivity extends AppCompatActivity {
                     startLocation = location;
                 }
 
-                // update distance travelled
-                if (lastLocation != null) {
-                    long timeDiff = location.getTime() - lastLocation.getTime();
-
-                    // only update location if >= 10 seconds has elapsed
-                    if (timeDiff < 10000) {
-                        continue;
-                    }
-
-                    distanceTravelled += lastLocation.distanceTo(location);
-                    textViewDistanceTravelled.setText(Math.round(distanceTravelled / 100.0) / 10.0 + " km");
+                if (lastLocation == null) {
+                    lastLocation = location;
+                    continue;
                 }
+
+                // only update location if >= 3 seconds has elapsed
+                long timeDiff = location.getTime() - lastLocation.getTime();
+                if (timeDiff < 3000) {
+                    continue;
+                }
+
+                // update distance travelled
+                distanceTravelled += lastLocation.distanceTo(location);
+                distanceTravelledText = Math.round(distanceTravelled / 100.0) / 10.0 + " km";
 
                 //update last location recorded
                 lastLocation = location;
 
-                Map<String, Object> newData = new HashMap<>();
-                newData.put("user_uuid", auth.getCurrentUser().getUid());
-                newData.put("latlng", new GeoPoint(location.getLatitude(), location.getLongitude()));
-                newData.put("timestamp", new Timestamp(lastLocation.getTime() / 1000, 0));
+                // update time elapsed
+                long elapsedTime = lastLocation.getTime() - startLocation.getTime();
+                timeElapsedText = outputFormat.format(elapsedTime);
 
-                coordinatesRef.add(newData);
+                // update average speed
+                double elapsedTimeSeconds = elapsedTime / 1000;
+                double metersPerSecond = distanceTravelled / elapsedTimeSeconds;
+                averageSpeed = metersPerSecond * 3.6;
+                averageSpeedText = Math.round(averageSpeed * 10.0) / 10.0 + " km/h";
+
+                //update current speed
+                currentSpeedText = Math.round(location.getSpeed() * 3.6 * 10.0) / 10.0 + " km/h";
+
+                //update text on app screen
+                textViewTimeElapsed.setText(timeElapsedText);
+                textViewAverageSpeed.setText(averageSpeedText);
+                textViewCurrentSpeed.setText(currentSpeedText);
+                textViewDistanceTravelled.setText(distanceTravelledText);
 
                 //update location on map
                 if (mapboxMap.getLocationComponent().isLocationComponentEnabled() && mapboxMap.getLocationComponent().isLocationComponentActivated()) {
                     mapboxMap.getLocationComponent().forceLocationUpdate(lastLocation);
                 }
 
-                //set current speed
-                textViewCurrentSpeed.setText(Math.round(location.getSpeed() * 3.6 * 10.0) / 10.0 + " km/h");
-
-                // update time elapsed
-                if (startLocation != null && lastLocation != null) {
-                    long elapsedTime = lastLocation.getTime() - startLocation.getTime();
-                    String formattedElapsedTime = outputFormat.format(elapsedTime);
-                    textViewTimeElapsed.setText(formattedElapsedTime);
-
-                    double elapsedTimeSeconds = elapsedTime / 1000;
-                    double metersPerSecond = distanceTravelled / elapsedTimeSeconds;
-                    averageSpeed = metersPerSecond * 3.6;
-                    textViewAverageSpeed.setText(Math.round(averageSpeed * 10.0) / 10.0 + " km/h");
-                }
+                //send data to firebase
+                Map<String, Object> newData = new HashMap<>();
+                newData.put("user_uuid", auth.getCurrentUser().getUid());
+                newData.put("latlng", new GeoPoint(location.getLatitude(), location.getLongitude()));
+                newData.put("timestamp", new Timestamp(lastLocation.getTime() / 1000, 0));
+                newData.put("average_speed", averageSpeedText);
+                newData.put("current_speed", currentSpeedText);
+                newData.put("distance_travelled", distanceTravelledText);
+                newData.put("time_elapsed", timeElapsedText);
+                coordinatesRef.add(newData);
             }
         }
     }
